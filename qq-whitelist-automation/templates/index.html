@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP白名单自动化添加系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        danger: '#EF4444',
+                        neutral: '#6B7280',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .bg-gradient-primary {
+                background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+            }
+            .shadow-card {
+                box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 8px 10px -6px rgba(59, 130, 246, 0.1);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <!-- 页面标题 -->
+        <header class="mb-10 text-center">
+            <h1 class="text-[clamp(1.8rem,5vw,2.5rem)] font-bold text-gray-800 mb-2">
+                <i class="fa fa-shield text-primary mr-2"></i>IP白名单自动化添加系统
+            </h1>
+            <p class="text-gray-600 max-w-2xl mx-auto">
+                输入IP地址，系统将自动添加到QQ聊天频道的白名单中
+            </p>
+        </header>
+        
+        <!-- 主卡片 -->
+        <div class="bg-white rounded-xl shadow-card overflow-hidden transform transition-all duration-300 hover:shadow-lg">
+            <!-- 卡片头部 -->
+            <div class="bg-gradient-primary text-white p-6">
+                <h2 class="text-xl font-semibold flex items-center">
+                    <i class="fa fa-plus-circle mr-2"></i>添加IP到白名单
+                </h2>
+            </div>
+            
+            <!-- 卡片内容 -->
+            <div class="p-6">
+                <!-- IP输入表单 -->
+                <form id="addIpForm" class="space-y-4">
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <div class="flex-1">
+                            <label for="ipAddress" class="block text-sm font-medium text-gray-700 mb-1">
+                                IP地址
+                            </label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                                    <i class="fa fa-server"></i>
+                                </span>
+                                <input type="text" id="ipAddress" name="ipAddress" 
+                                    class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
+                                    placeholder="例如: 192.168.1.1" required>
+                            </div>
+                        </div>
+                        <div class="flex items-end">
+                            <button type="submit" id="addButton" 
+                                class="bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-lg transition-all duration-200 flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fa fa-plus mr-2"></i>添加
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- 状态显示 -->
+                <div id="statusContainer" class="mt-6 hidden">
+                    <div id="statusCard" class="p-4 rounded-lg transition-all duration-300">
+                        <div class="flex items-start">
+                            <div id="statusIcon" class="mr-3 mt-0.5">
+                                <i class="fa fa-spinner fa-spin text-primary"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 id="statusTitle" class="text-sm font-medium text-gray-800">处理中</h3>
+                                <p id="statusMessage" class="text-sm text-gray-600 mt-1">正在添加IP地址到白名单...</p>
+                            </div>
+                            <button id="closeStatus" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 历史记录 -->
+                <div class="mt-8">
+                    <h3 class="text-lg font-medium text-gray-800 mb-4 flex items-center">
+                        <i class="fa fa-history mr-2 text-neutral"></i>操作历史
+                    </h3>
+                    <div id="historyList" class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                        <div class="text-center text-gray-500 text-sm italic py-4">
+                            暂无历史记录
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 页脚 -->
+        <footer class="mt-12 text-center text-gray-500 text-sm">
+            <p>© 2025 IP白名单自动化系统 | 设计与开发</p>
+        </footer>
+    </div>
+    
+    <script>
+        // 连接SocketIO服务器
+        const socket = io();
+        let currentRequestId = null;
+        
+        // 表单提交处理
+        document.getElementById('addIpForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const ipAddress = document.getElementById('ipAddress').value.trim();
+            if (!ipAddress) {
+                showStatus('错误', 'IP地址不能为空', 'error');
+                return;
+            }
+            
+            // 禁用按钮
+            const addButton = document.getElementById('addButton');
+            addButton.disabled = true;
+            
+            // 发送IP地址到服务器
+            fetch('/add_ip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ip_address: ipAddress })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'processing') {
+                    showStatus('处理中', `正在添加IP: ${ipAddress}`, 'processing');
+                    addHistoryEntry(ipAddress, '处理中', new Date());
+                } else {
+                    showStatus('错误', data.message || '添加失败', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showStatus('错误', '网络错误，请稍后再试', 'error');
+            })
+            .finally(() => {
+                // 重新启用按钮
+                addButton.disabled = false;
+            });
+        });
+        
+        // 监听状态更新
+        socket.on('status_update', function(data) {
+            if (data.processing) {
+                showStatus('处理中', data.message, 'processing');
+            } else if (data.success) {
+                showStatus('成功', data.message, 'success');
+                updateHistoryEntry(data.message.split(' ')[1], '成功', new Date());
+            } else {
+                showStatus('失败', data.message, 'error');
+                updateHistoryEntry(data.message.split(' ')[1], '失败', new Date());
+            }
+        });
+        
+        // 关闭状态卡片
+        document.getElementById('closeStatus').addEventListener('click', function() {
+            document.getElementById('statusContainer').classList.add('hidden');
+        });
+        
+        // 显示状态信息
+        function showStatus(title, message, type) {
+            const statusContainer = document.getElementById('statusContainer');
+            const statusCard = document.getElementById('statusCard');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusMessage = document.getElementById('statusMessage');
+            const statusIcon = document.getElementById('statusIcon').querySelector('i');
+            
+            // 设置标题和消息
+            statusTitle.textContent = title;
+            statusMessage.textContent = message;
+            
+            // 设置图标和颜色
+            statusIcon.className = '';
+            if (type === 'processing') {
+                statusIcon.className = 'fa fa-spinner fa-spin text-primary';
+                statusCard.className = 'p-4 rounded-lg bg-blue-50 border-l-4 border-primary';
+            } else if (type === 'success') {
+                statusIcon.className = 'fa fa-check-circle text-secondary';
+                statusCard.className = 'p-4 rounded-lg bg-green-50 border-l-4 border-secondary';
+            } else if (type === 'error') {
+                statusIcon.className = 'fa fa-exclamation-circle text-danger';
+                statusCard.className = 'p-4 rounded-lg bg-red-50 border-l-4 border-danger';
+            }
+            
+            // 显示状态卡片
+            statusContainer.classList.remove('hidden');
+            
+            // 平滑滚动到状态卡片
+            statusContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        // 添加历史记录条目
+        function addHistoryEntry(ip, status, timestamp) {
+            const historyList = document.getElementById('historyList');
+            
+            // 如果是第一条记录，清空"暂无历史记录"消息
+            if (historyList.querySelector('.italic')) {
+                historyList.innerHTML = '';
+            }
+            
+            const formattedTime = formatDateTime(timestamp);
+            const entry = document.createElement('div');
+            entry.className = 'p-3 bg-gray-50 rounded-lg flex items-center justify-between transition-all duration-200 hover:bg-gray-100';
+            entry.dataset.ip = ip;
+            
+            entry.innerHTML = `
+                <div class="flex items-center">
+                    <div class="w-2 h-2 rounded-full bg-yellow-500 mr-3"></div>
+                    <div>
+                        <div class="text-sm font-medium text-gray-800">${ip}</div>
+                        <div class="text-xs text-gray-500">${formattedTime}</div>
+                    </div>
+                </div>
+                <div class="text-sm font-medium text-yellow-600">
+                    <i class="fa fa-clock-o mr-1"></i>${status}
+                </div>
+            `;
+            
+            // 添加到历史记录顶部
+            historyList.insertBefore(entry, historyList.firstChild);
+        }
+        
+        // 更新历史记录条目状态
+        function updateHistoryEntry(ip, status, timestamp) {
+            const entry = document.querySelector(`[data-ip="${ip}"]`);
+            if (!entry) return;
+            
+            const statusElement = entry.querySelector('.text-yellow-600, .text-green-600, .text-red-600');
+            const statusIcon = statusElement.querySelector('i');
+            const dotElement = entry.querySelector('.w-2.h-2.rounded-full');
+            
+            if (status === '成功') {
+                statusElement.className = 'text-sm font-medium text-green-600';
+                statusIcon.className = 'fa fa-check mr-1';
+                dotElement.className = 'w-2 h-2 rounded-full bg-green-500 mr-3';
+            } else if (status === '失败') {
+                statusElement.className = 'text-sm font-medium text-red-600';
+                statusIcon.className = 'fa fa-times mr-1';
+                dotElement.className = 'w-2 h-2 rounded-full bg-red-500 mr-3';
+            }
+            
+            // 添加动画效果
+            entry.classList.add('bg-blue-50');
+            setTimeout(() => {
+                entry.classList.remove('bg-blue-50');
+            }, 1000);
+        }
+        
+        // 格式化日期时间
+        function formatDateTime(date) {
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
+        }
+    </script>
+</body>
+</html>    
