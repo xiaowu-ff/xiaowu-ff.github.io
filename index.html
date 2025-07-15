@@ -36,3 +36,39 @@
     </script>
 </body>
 </html>
+// 服务器A的后端（Node.js + Express）
+const express = require('express');
+const net = require('net'); // 用于与服务器B的exe建立TCP连接
+const app = express();
+app.use(express.json());
+
+// 与服务器B的exe建立长连接（假设exe监听端口为8888）
+const client = new net.Socket();
+client.connect(8888, '192.140.164.153', () => {
+    console.log('已连接到服务器B的exe程序');
+});
+
+// 接收前端IP并转发给服务器B的exe
+app.post('/api/send-ip', (req, res) => {
+    const { ip } = req.body;
+    if (!ip) {
+        return res.json({ message: 'IP地址为空' });
+    }
+
+    // 向服务器B的exe发送IP（约定格式：ip=xxx）
+    client.write(`ip=${ip}\n`, (err) => {
+        if (err) {
+            return res.json({ message: '发送失败' });
+        }
+    });
+
+    // 等待exe返回结果（通过client.on('data')监听）
+    client.once('data', (data) => {
+        const result = data.toString().trim();
+        res.json({ message: result }); // 反馈到网页端
+    });
+});
+
+app.listen(3000, () => {
+    console.log('服务器A运行在端口3000');
+});
