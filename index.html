@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IP白名单添加系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#165DFF',
+            success: '#00B42A',
+            danger: '#F53F3F',
+            warning: '#FF7D00',
+            dark: '#1D2129',
+            'gray-light': '#F2F3F5'
+          },
+          fontFamily: {
+            inter: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .shadow-soft {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      }
+      .transition-all-300 {
+        transition: all 300ms ease-in-out;
+      }
+      .scale-hover {
+        transition: transform 0.2s ease;
+      }
+      .scale-hover:hover {
+        transform: scale(1.02);
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 font-inter text-dark min-h-screen flex flex-col">
+  <!-- 顶部导航 -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <i class="fa fa-shield text-primary text-2xl"></i>
+        <h1 class="text-xl font-semibold">IP白名单管理系统</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="text-sm text-gray-500" id="status-indicator">
+          <i class="fa fa-circle text-success text-xs mr-1"></i>
+          系统正常运行中
+        </span>
+        <button class="text-gray-500 hover:text-primary transition-all-300">
+          <i class="fa fa-question-circle"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="flex-grow container mx-auto px-4 py-8 md:py-16">
+    <div class="max-w-2xl mx-auto">
+      <!-- 卡片容器 -->
+      <div class="bg-white rounded-xl shadow-soft p-6 md:p-8 mb-6 scale-hover">
+        <div class="mb-6">
+          <h2 class="text-[clamp(1.25rem,3vw,1.75rem)] font-semibold mb-2">添加IP到白名单</h2>
+          <p class="text-gray-500 text-sm">输入需要添加的IP地址，系统将自动完成白名单添加流程</p>
+        </div>
+        
+        <!-- 表单 -->
+        <form id="ip-form" class="space-y-6">
+          <div>
+            <label for="ip-address" class="block text-sm font-medium text-gray-700 mb-1">IP地址</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                <i class="fa fa-globe"></i>
+              </span>
+              <input 
+                type="text" 
+                id="ip-address" 
+                placeholder="例如：192.168.1.1" 
+                class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all-300"
+                required
+              >
+            </div>
+            <p class="mt-2 text-xs text-gray-500">
+              <i class="fa fa-info-circle mr-1"></i>
+              系统将自动在您输入的IP前添加"43.249.192.150添加白名单"前缀
+            </p>
+          </div>
+          
+          <button 
+            type="submit" 
+            id="add-button"
+            class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-all-300 flex items-center justify-center space-x-2 shadow-lg shadow-primary/20"
+          >
+            <i class="fa fa-plus-circle"></i>
+            <span>添加到白名单</span>
+          </button>
+        </form>
+      </div>
+      
+      <!-- 状态反馈区域 -->
+      <div id="feedback-area" class="hidden rounded-xl p-6 transition-all-300">
+        <!-- 加载状态 -->
+        <div id="loading-state" class="hidden flex items-center justify-center space-x-3 text-gray-600">
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <span>正在处理，请稍候...</span>
+        </div>
+        
+        <!-- 成功状态 -->
+        <div id="success-state" class="hidden bg-success/10 border border-success/30 text-success p-6 rounded-xl">
+          <div class="flex items-start space-x-4">
+            <div class="text-success text-xl mt-1">
+              <i class="fa fa-check-circle"></i>
+            </div>
+            <div>
+              <h3 class="font-medium text-lg mb-1">操作成功</h3>
+              <p class="text-sm">IP地址已成功添加到白名单，QQ频道已收到确认信息。</p>
+              <div class="mt-4">
+                <p class="text-xs bg-white/50 p-3 rounded-lg font-mono">
+                  <span id="success-message"></span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 错误状态 -->
+        <div id="error-state" class="hidden bg-danger/10 border border-danger/30 text-danger p-6 rounded-xl">
+          <div class="flex items-start space-x-4">
+            <div class="text-danger text-xl mt-1">
+              <i class="fa fa-exclamation-circle"></i>
+            </div>
+            <div>
+              <h3 class="font-medium text-lg mb-1">操作失败</h3>
+              <p class="text-sm" id="error-message">处理过程中出现错误，请重试。</p>
+              <button id="retry-button" class="mt-4 text-sm bg-danger/20 hover:bg-danger/30 text-danger px-4 py-2 rounded-lg transition-all-300">
+                重试
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 历史记录 -->
+      <div class="mt-8">
+        <h3 class="text-lg font-medium mb-4 flex items-center">
+          <i class="fa fa-history text-gray-400 mr-2"></i>
+          最近操作记录
+        </h3>
+        <div id="history-list" class="space-y-3 max-h-64 overflow-y-auto pr-2">
+          <div class="text-gray-400 text-center py-8 text-sm">
+            暂无操作记录
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 页脚 -->
+  <footer class="bg-white border-t border-gray-200 py-6">
+    <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+      <p>© 2023 IP白名单管理系统 - 版权所有</p>
+    </div>
+  </footer>
+
+  <script>
+    // DOM元素
+    const form = document.getElementById('ip-form');
+    const ipInput = document.getElementById('ip-address');
+    const addButton = document.getElementById('add-button');
+    const feedbackArea = document.getElementById('feedback-area');
+    const loadingState = document.getElementById('loading-state');
+    const successState = document.getElementById('success-state');
+    const errorState = document.getElementById('error-state');
+    const successMessage = document.getElementById('success-message');
+    const errorMessage = document.getElementById('error-message');
+    const retryButton = document.getElementById('retry-button');
+    const historyList = document.getElementById('history-list');
+    
+    // 处理表单提交
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const ipAddress = ipInput.value.trim();
+      
+      if (validateIp(ipAddress)) {
+        processIpAddition(ipAddress);
+      } else {
+        showError('请输入有效的IP地址');
+      }
+    });
+    
+    // 重试按钮事件
+    retryButton.addEventListener('click', function() {
+      const ipAddress = ipInput.value.trim();
+      if (validateIp(ipAddress)) {
+        processIpAddition(ipAddress);
+      } else {
+        showError('请输入有效的IP地址');
+      }
+    });
+    
+    // 验证IP地址格式
+    function validateIp(ip) {
+      const ipRegex = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/;
+      return ipRegex.test(ip);
+    }
+    
+    // 处理IP添加流程
+    function processIpAddition(ipAddress) {
+      // 显示加载状态
+      showLoading();
+      
+      // 构建要发送的消息
+      const fullMessage = `43.249.192.150添加白名单 ${ipAddress}`;
+      
+      // 模拟API请求（实际应用中替换为真实的API调用）
+      setTimeout(() => {
+        // 模拟成功率为90%
+        const isSuccess = Math.random() > 0.1;
+        
+        if (isSuccess) {
+          showSuccess(fullMessage);
+          addToHistory(ipAddress, 'success');
+        } else {
+          showError('添加失败，请稍后重试');
+          addToHistory(ipAddress, 'error');
+        }
+        
+        // 清空输入框
+        ipInput.value = '';
+      }, 2000);
+    }
+    
+    // 显示加载状态
+    function showLoading() {
+      feedbackArea.classList.remove('hidden');
+      feedbackArea.classList.remove('bg-success/10', 'bg-danger/10', 'border-success/30', 'border-danger/30');
+      
+      loadingState.classList.remove('hidden');
+      successState.classList.add('hidden');
+      errorState.classList.add('hidden');
+      
+      // 禁用按钮
+      addButton.disabled = true;
+      addButton.classList.add('opacity-70', 'cursor-not-allowed');
+    }
+    
+    // 显示成功状态
+    function showSuccess(message) {
+      loadingState.classList.add('hidden');
+      successState.classList.remove('hidden');
+      errorState.classList.add('hidden');
+      
+      feedbackArea.classList.add('bg-success/10', 'border', 'border-success/30');
+      
+      successMessage.textContent = message;
+      
+      // 启用按钮
+      addButton.disabled = false;
+      addButton.classList.remove('opacity-70', 'cursor-not-allowed');
+    }
+    
+    // 显示错误状态
+    function showError(message) {
+      loadingState.classList.add('hidden');
+      successState.classList.add('hidden');
+      errorState.classList.remove('hidden');
+      
+      feedbackArea.classList.add('bg-danger/10', 'border', 'border-danger/30');
+      
+      errorMessage.textContent = message;
+      
+      // 启用按钮
+      addButton.disabled = false;
+      addButton.classList.remove('opacity-70', 'cursor-not-allowed');
+    }
+    
+    // 添加到历史记录
+    function addToHistory(ip, status) {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString();
+      
+      const historyItem = document.createElement('div');
+      historyItem.className = `flex items-center justify-between p-3 rounded-lg ${
+        status === 'success' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+      }`;
+      
+      historyItem.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <i class="fa ${status === 'success' ? 'fa-check-circle' : 'fa-times-circle'}"></i>
+          <span>${ip}</span>
+        </div>
+        <span class="text-xs">${timeString}</span>
+      `;
+      
+      // 如果是第一条记录，清除"暂无记录"提示
+      if (historyList.querySelector('.text-center')) {
+        historyList.innerHTML = '';
+      }
+      
+      // 添加到历史列表顶部
+      historyList.insertBefore(historyItem, historyList.firstChild);
+    }
+    
+    // 输入框获取焦点时移除错误状态
+    ipInput.addEventListener('focus', function() {
+      errorState.classList.add('hidden');
+    });
+  </script>
+</body>
+</html>
