@@ -1,74 +1,273 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <title>IP白名单添加</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IP白名单添加系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- 配置Tailwind -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#165DFF',
+            secondary: '#36D399',
+            danger: '#F87272',
+            neutral: '#64748B',
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .card-shadow {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+      }
+      .btn-hover {
+        transition: all 0.3s ease;
+      }
+      .btn-hover:hover {
+        transform: translateY(-2px);
+      }
+    }
+  </style>
 </head>
-<body>
-    <h3>添加IP到白名单</h3>
-    <input type="text" id="ipInput" placeholder="请输入IP地址">
-    <button onclick="sendIP()">添加</button>
-    <div id="result" style="margin-top: 10px;"></div>
-
-    <script>
-        // 点击按钮后，将IP发送到后端API
-        function sendIP() {
-            const ip = document.getElementById("ipInput").value.trim();
-            const resultDiv = document.getElementById("result");
-            if (!ip) {
-                resultDiv.innerText = "请输入IP地址";
-                return;
-            }
-
-            // 调用后端API（服务器A的接口）
-            fetch("http://服务器A的IP:端口/api/send-ip", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ip: ip })
-            })
-            .then(res => res.json())
-            .then(data => {
-                resultDiv.innerText = data.message; // 显示反馈结果（成功/失败）
-            })
-            .catch(err => {
-                resultDiv.innerText = "发送失败，请重试";
-            });
+<body class="bg-gray-50 font-inter min-h-screen">
+  <div class="container mx-auto px-4 py-12 max-w-4xl">
+    <!-- 页面标题 -->
+    <div class="text-center mb-10">
+      <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-gray-800 mb-3">
+        IP白名单添加系统
+      </h1>
+      <p class="text-gray-600 max-w-2xl mx-auto">
+        输入IP地址，系统将自动发送到"牛哥v枣庄售后群"并反馈结果
+      </p>
+    </div>
+    
+    <!-- 主卡片 -->
+    <div class="bg-white rounded-xl card-shadow p-6 md:p-8 mb-8">
+      <!-- IP输入区域 -->
+      <div class="mb-6">
+        <label for="ipAddress" class="block text-gray-700 font-medium mb-2">
+          请输入IP地址
+        </label>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input 
+            type="text" 
+            id="ipAddress" 
+            placeholder="例如：192.168.1.1"
+            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+          >
+          <button 
+            id="addButton" 
+            class="btn-hover bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+          >
+            <i class="fa fa-plus-circle"></i>
+            <span>添加到白名单</span>
+          </button>
+        </div>
+        <p class="text-sm text-gray-500 mt-2">
+          系统将自动添加前缀：43.249.192.150添加白名单
+        </p>
+      </div>
+      
+      <!-- 状态和结果区域 -->
+      <div id="resultArea" class="hidden">
+        <div class="p-4 rounded-lg border transition-all duration-300" id="resultContainer">
+          <!-- 加载状态 -->
+          <div id="loadingState" class="hidden flex items-center gap-3">
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <p class="text-gray-700">正在处理，请稍候...</p>
+          </div>
+          
+          <!-- 成功状态 -->
+          <div id="successState" class="hidden flex items-center gap-3 text-green-700 bg-green-50 border-green-200">
+            <i class="fa fa-check-circle text-xl text-green-500"></i>
+            <div>
+              <p class="font-medium">操作成功</p>
+              <p class="text-sm mt-1" id="successMessage"></p>
+            </div>
+          </div>
+          
+          <!-- 错误状态 -->
+          <div id="errorState" class="hidden flex items-center gap-3 text-red-700 bg-red-50 border-red-200">
+            <i class="fa fa-exclamation-circle text-xl text-red-500"></i>
+            <div>
+              <p class="font-medium">操作失败</p>
+              <p class="text-sm mt-1" id="errorMessage"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 历史记录 -->
+    <div class="bg-white rounded-xl card-shadow p-6 md:p-8">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <i class="fa fa-history text-gray-500"></i>
+        操作历史
+      </h2>
+      <div id="historyList" class="space-y-3 max-h-60 overflow-y-auto pr-2">
+        <div class="text-gray-500 text-center py-8 border border-dashed rounded-lg">
+          暂无操作记录
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // DOM元素
+    const ipInput = document.getElementById('ipAddress');
+    const addButton = document.getElementById('addButton');
+    const resultArea = document.getElementById('resultArea');
+    const resultContainer = document.getElementById('resultContainer');
+    const loadingState = document.getElementById('loadingState');
+    const successState = document.getElementById('successState');
+    const errorState = document.getElementById('errorState');
+    const successMessage = document.getElementById('successMessage');
+    const errorMessage = document.getElementById('errorMessage');
+    const historyList = document.getElementById('historyList');
+    
+    // IP地址验证正则
+    const ipRegex = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/;
+    
+    // 添加按钮点击事件
+    addButton.addEventListener('click', async () => {
+      const ipAddress = ipInput.value.trim();
+      
+      // 验证IP地址
+      if (!ipAddress) {
+        showError('请输入IP地址');
+        return;
+      }
+      
+      if (!ipRegex.test(ipAddress)) {
+        showError('请输入有效的IP地址');
+        return;
+      }
+      
+      // 显示加载状态
+      showLoading();
+      
+      try {
+        // 构建要发送的消息
+        const message = `43.249.192.150添加白名单${ipAddress}`;
+        
+        // 调用后端API，将消息发送到exe程序
+        // 实际应用中，这里应该是与你的后端服务通信
+        const response = await fetch('/api/send-to-qq', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            ip: ipAddress,
+            fullMessage: message,
+            groupName: '牛哥v枣庄售后群'
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // 显示成功状态
+          showSuccess(`IP地址 ${ipAddress} 已成功发送到QQ群，且确认添加成功`);
+          // 添加到历史记录
+          addToHistory(ipAddress, true);
+        } else {
+          // 显示错误状态
+          showError(result.message || `处理IP地址 ${ipAddress} 时出错`);
+          // 添加到历史记录
+          addToHistory(ipAddress, false, result.message);
         }
-    </script>
+      } catch (error) {
+        console.error('操作失败:', error);
+        showError('服务器通信失败，请稍后重试');
+        addToHistory(ipAddress, false, '服务器通信失败');
+      }
+      
+      // 清空输入框
+      ipInput.value = '';
+    });
+    
+    // 按Enter键触发添加
+    ipInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addButton.click();
+      }
+    });
+    
+    // 显示加载状态
+    function showLoading() {
+      resultArea.classList.remove('hidden');
+      loadingState.classList.remove('hidden');
+      successState.classList.add('hidden');
+      errorState.classList.add('hidden');
+    }
+    
+    // 显示成功状态
+    function showSuccess(message) {
+      resultArea.classList.remove('hidden');
+      loadingState.classList.add('hidden');
+      successState.classList.remove('hidden');
+      errorState.classList.add('hidden');
+      successMessage.textContent = message;
+      
+      // 3秒后自动隐藏结果
+      setTimeout(() => {
+        resultArea.classList.add('hidden');
+      }, 5000);
+    }
+    
+    // 显示错误状态
+    function showError(message) {
+      resultArea.classList.remove('hidden');
+      loadingState.classList.add('hidden');
+      successState.classList.add('hidden');
+      errorState.classList.remove('hidden');
+      errorMessage.textContent = message;
+    }
+    
+    // 添加到历史记录
+    function addToHistory(ip, success, message = '') {
+      const now = new Date();
+      const timeStr = now.toLocaleString();
+      
+      const historyItem = document.createElement('div');
+      historyItem.className = `p-3 rounded-lg border ${success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`;
+      
+      historyItem.innerHTML = `
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="font-medium ${success ? 'text-green-800' : 'text-red-800'}">
+              ${success ? '成功' : '失败'}: ${ip}
+            </p>
+            <p class="text-sm text-gray-500 mt-1">${timeStr}</p>
+          </div>
+          <span class="text-lg">${success ? '✓' : '✗'}</span>
+        </div>
+        ${message ? `<p class="text-sm mt-2 text-gray-600">${message}</p>` : ''}
+      `;
+      
+      // 如果是第一条记录，先清空
+      if (historyList.querySelector('.text-gray-500.text-center')) {
+        historyList.innerHTML = '';
+      }
+      
+      // 添加到历史记录顶部
+      historyList.prepend(historyItem);
+    }
+  </script>
 </body>
 </html>
-// 服务器A的后端（Node.js + Express）
-const express = require('express');
-const net = require('net'); // 用于与服务器B的exe建立TCP连接
-const app = express();
-app.use(express.json());
-
-// 与服务器B的exe建立长连接（假设exe监听端口为8888）
-const client = new net.Socket();
-client.connect(8888, '192.140.164.153', () => {
-    console.log('已连接到服务器B的exe程序');
-});
-
-// 接收前端IP并转发给服务器B的exe
-app.post('/api/send-ip', (req, res) => {
-    const { ip } = req.body;
-    if (!ip) {
-        return res.json({ message: 'IP地址为空' });
-    }
-
-    // 向服务器B的exe发送IP（约定格式：ip=xxx）
-    client.write(`ip=${ip}\n`, (err) => {
-        if (err) {
-            return res.json({ message: '发送失败' });
-        }
-    });
-
-    // 等待exe返回结果（通过client.on('data')监听）
-    client.once('data', (data) => {
-        const result = data.toString().trim();
-        res.json({ message: result }); // 反馈到网页端
-    });
-});
-
-app.listen(3000, () => {
-    console.log('服务器A运行在端口3000');
-});
