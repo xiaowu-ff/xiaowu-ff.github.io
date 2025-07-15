@@ -190,7 +190,7 @@
       
       try {
         // 模拟API请求 - 实际项目中应替换为真实的API调用
-        const response = await simulateAddToWhitelist(ip);
+        const API_BASE_URL = 'http://192.140.164.153:5000/api';
         
         // 隐藏加载状态
         hideLoading();
